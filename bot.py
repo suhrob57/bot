@@ -102,9 +102,10 @@ async def main():
 # **ASYNCIO LOOP MUAMMOSINI HAL QILISH**
 if __name__ == '__main__':
     try:
-        if asyncio.get_event_loop().is_running():
-            asyncio.ensure_future(main())  # Agar loop allaqachon ishlayotgan bo'lsa, `ensure_future` ishlatiladi
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(main())  # Agar loop allaqachon ishlayotgan bo‘lsa, `create_task` ishlatiladi
         else:
-            asyncio.run(main())  # Aks holda, `asyncio.run()` yordamida yangi loop yaratiladi
+            loop.run_until_complete(main())  # Aks holda, yangi loop yaratib ishlatamiz
     except KeyboardInterrupt:
         logging.info("🛑 Bot to‘xtatildi")
