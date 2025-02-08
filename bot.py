@@ -1,25 +1,21 @@
 import logging
 import json
 import asyncio
-import nest_asyncio
 import os
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatMemberStatus
 
-# nest_asyncio ni faollashtirish (faqat Jupyter Notebook uchun kerak)
-nest_asyncio.apply()
-
 # Muhit o'zgaruvchilarini yuklash
 load_dotenv()
 
 # TOKENNI OLISH
-BOT_TOKEN = os.getenv("7994422754:AAFupetwi_k363L8OneZE9KL8HuAkoobHjA")
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # To'g'ri usul
 
 # AGAR .env ISHLAMASA, TOKENNI SHUYERGA YOZING (lekin xavfsiz emas!)
 if not BOT_TOKEN:
-    BOT_TOKEN = "YOUR_BOT_TOKEN"  # <-- BU YERGA TOKEN YAZING (faqat vaqtinchalik!)
+    BOT_TOKEN = "YOUR_BOT_TOKEN"  # <-- BU YERGA TOKEN YOZING (faqat vaqtinchalik!)
 
 if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN":
     raise ValueError("❌ BOT_TOKEN topilmadi! .env faylni tekshiring yoki tokenni qo'lda kiriting.")
@@ -109,6 +105,7 @@ async def main():
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        loop = asyncio.get_event_loop()  # get_event_loop() yordamida ishga tushiramiz
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
         logging.info("🛑 Bot to‘xtatildi")
