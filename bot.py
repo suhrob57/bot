@@ -11,13 +11,9 @@ from telegram.constants import ChatMemberStatus
 load_dotenv()
 
 # TOKENNI OLISH
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # To'g'ri usul
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# AGAR .env ISHLAMASA, TOKENNI SHUYERGA YOZING (lekin xavfsiz emas!)
 if not BOT_TOKEN:
-    BOT_TOKEN = "YOUR_BOT_TOKEN"  # <-- BU YERGA TOKEN YOZING (faqat vaqtinchalik!)
-
-if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN":
     raise ValueError("❌ BOT_TOKEN topilmadi! .env faylni tekshiring yoki tokenni qo'lda kiriting.")
 
 # Debug uchun tokenni tekshirish
@@ -103,9 +99,12 @@ async def main():
     logging.info("🚀 Bot ishga tushdi...")
     await application.run_polling()
 
+# **ASYNCIO LOOP MUAMMOSINI HAL QILISH**
 if __name__ == '__main__':
     try:
-        loop = asyncio.get_event_loop()  # get_event_loop() yordamida ishga tushiramiz
-        loop.run_until_complete(main())
+        if asyncio.get_event_loop().is_running():
+            asyncio.ensure_future(main())  # Agar loop allaqachon ishlayotgan bo'lsa, `ensure_future` ishlatiladi
+        else:
+            asyncio.run(main())  # Aks holda, `asyncio.run()` yordamida yangi loop yaratiladi
     except KeyboardInterrupt:
         logging.info("🛑 Bot to‘xtatildi")
