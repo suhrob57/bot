@@ -16,10 +16,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN topilmadi! .env faylni tekshiring yoki tokenni qo'lda kiriting.")
 
-# Debug uchun tokenni tekshirish
-print("⚙️ Muhit o'zgaruvchilari yuklandi...")
-print(f"🔑 BOT_TOKEN: {BOT_TOKEN[:5]}*** (yashirin)")
-
 # Kanal username'larini kiritish
 CHANNEL_USERNAMES = ['@bekM_gamer', '@TESLA_esports']
 
@@ -99,13 +95,5 @@ async def main():
     logging.info("🚀 Bot ishga tushdi...")
     await application.run_polling()
 
-# **ASYNCIO LOOP MUAMMOSINI HAL QILISH**
-if __name__ == '__main__':
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(main())  # Agar loop allaqachon ishlayotgan bo‘lsa, `create_task` ishlatiladi
-        else:
-            loop.run_until_complete(main())  # Aks holda, yangi loop yaratib ishlatamiz
-    except KeyboardInterrupt:
-        logging.info("🛑 Bot to‘xtatildi")
+if __name__ == "__main__":
+    asyncio.run(main())
