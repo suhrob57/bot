@@ -15,7 +15,7 @@ nest_asyncio.apply()
 load_dotenv()
 
 # TOKENNI OLISH
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("7994422754:AAFupetwi_k363L8OneZE9KL8HuAkoobHjA")
 
 # AGAR .env ISHLAMASA, TOKENNI SHUYERGA YOZING (lekin xavfsiz emas!)
 if not BOT_TOKEN:
