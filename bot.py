@@ -3,6 +3,7 @@ import json
 import asyncio
 import nest_asyncio
 import os
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatMemberStatus
@@ -10,7 +11,8 @@ from telegram.constants import ChatMemberStatus
 # nest_asyncio ni faollashtirish (faqat Jupyter Notebook uchun kerak)
 nest_asyncio.apply()
 
-# Bot tokenini olish
+# Muhit o'zgaruvchilarini yuklash
+load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN o'rnatilmagan! Iltimos, muhit o'zgaruvchilarini tekshiring.")
@@ -19,12 +21,15 @@ if not BOT_TOKEN:
 CHANNEL_USERNAMES = ['@bekM_gamer', '@TESLA_esports']
 
 # JSON faylni o‘qish
-try:
-    with open('movies.json', 'r', encoding='utf-8') as file:
-        movies_data = json.load(file)
-except (FileNotFoundError, json.JSONDecodeError):
-    logging.error("movies.json fayli topilmadi yoki noto‘g‘ri formatda.")
-    movies_data = {}
+def load_movies():
+    try:
+        with open('movies.json', 'r', encoding='utf-8') as file:
+            return json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError):
+        logging.error("movies.json fayli topilmadi yoki noto‘g‘ri formatda.")
+        return {}
+
+movies_data = load_movies()
 
 # Foydalanuvchi obuna bo'lganligini tekshirish
 async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channel_username: str) -> bool:
@@ -32,7 +37,7 @@ async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channe
         chat_member = await context.bot.get_chat_member(chat_id=channel_username, user_id=user_id)
         return chat_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
-        logging.error(f"Obunani tekshirishda xatolik: {e}")
+        logging.error(f"Obunani tekshirishda xatolik ({channel_username}): {e}")
         return False
 
 # /start komandasi
@@ -64,7 +69,7 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not all([await is_subscribed(user_id, context, channel) for channel in CHANNEL_USERNAMES]):
         await update.message.reply_text("Iltimos, avval barcha kanalga obuna bo‘ling.")
         return
-
+    
     number = update.message.text.strip()
     video_info = movies_data.get(number)
     if video_info:
@@ -79,8 +84,8 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("Uzr, bu raqamga mos video topilmadi.")
 
 # Botni ishga tushirish
-def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+async def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # Handlerlar
@@ -89,7 +94,10 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'^\d+$'), handle_number))
 
     logging.info("Bot ishga tushdi...")
-    application.run_polling()
+    await application.run_polling()
 
 if __name__ == '__main__':
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Bot to‘xtatildi")
