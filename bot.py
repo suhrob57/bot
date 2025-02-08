@@ -14,13 +14,19 @@ nest_asyncio.apply()
 # Muhit o'zgaruvchilarini yuklash
 load_dotenv()
 
-# DEBUG: Muhit o'zgaruvchilarini tekshirish
-print("⚙️ Muhit o'zgaruvchilari yuklandi...")
-print(f"🔑 BOT_TOKEN: {os.getenv('BOT_TOKEN')}")  # Debug uchun
-
+# TOKENNI OLISH
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+# AGAR .env ISHLAMASA, TOKENNI SHUYERGA YOZING (lekin xavfsiz emas!)
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN o'rnatilmagan! Iltimos, muhit o'zgaruvchilarini tekshiring.")
+    BOT_TOKEN = "YOUR_BOT_TOKEN"  # <-- BU YERGA TOKEN YAZING (faqat vaqtinchalik!)
+
+if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN":
+    raise ValueError("❌ BOT_TOKEN topilmadi! .env faylni tekshiring yoki tokenni qo'lda kiriting.")
+
+# Debug uchun tokenni tekshirish
+print("⚙️ Muhit o'zgaruvchilari yuklandi...")
+print(f"🔑 BOT_TOKEN: {BOT_TOKEN[:5]}*** (yashirin)")
 
 # Kanal username'larini kiritish
 CHANNEL_USERNAMES = ['@bekM_gamer', '@TESLA_esports']
