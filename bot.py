@@ -13,9 +13,14 @@ nest_asyncio.apply()
 
 # Muhit o'zgaruvchilarini yuklash
 load_dotenv()
+
+# DEBUG: Muhit o'zgaruvchilarini tekshirish
+print("⚙️ Muhit o'zgaruvchilari yuklandi...")
+print(f"🔑 BOT_TOKEN: {os.getenv('BOT_TOKEN')}")  # Debug uchun
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN o'rnatilmagan! Iltimos, muhit o'zgaruvchilarini tekshiring.")
+    raise ValueError("❌ BOT_TOKEN o'rnatilmagan! Iltimos, muhit o'zgaruvchilarini tekshiring.")
 
 # Kanal username'larini kiritish
 CHANNEL_USERNAMES = ['@bekM_gamer', '@TESLA_esports']
@@ -26,7 +31,7 @@ def load_movies():
         with open('movies.json', 'r', encoding='utf-8') as file:
             return json.load(file)
     except (FileNotFoundError, json.JSONDecodeError):
-        logging.error("movies.json fayli topilmadi yoki noto‘g‘ri formatda.")
+        logging.error("❌ movies.json fayli topilmadi yoki noto‘g‘ri formatda.")
         return {}
 
 movies_data = load_movies()
@@ -37,37 +42,37 @@ async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channe
         chat_member = await context.bot.get_chat_member(chat_id=channel_username, user_id=user_id)
         return chat_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
-        logging.error(f"Obunani tekshirishda xatolik ({channel_username}): {e}")
+        logging.error(f"⚠️ Obunani tekshirishda xatolik ({channel_username}): {e}")
         return False
 
 # /start komandasi
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.from_user.id
     if all([await is_subscribed(user_id, context, channel) for channel in CHANNEL_USERNAMES]):
-        await update.message.reply_text("Xush kelibsiz! Botdan foydalanish uchun raqam yuboring.")
+        await update.message.reply_text("✅ Xush kelibsiz! Botdan foydalanish uchun raqam yuboring.")
     else:
         keyboard = [[InlineKeyboardButton("1-kanalga obuna bo‘lish", url=f"https://t.me/{CHANNEL_USERNAMES[0][1:]}")],
                     [InlineKeyboardButton("2-kanalga obuna bo‘lish", url=f"https://t.me/{CHANNEL_USERNAMES[1][1:]}")],
                     [InlineKeyboardButton("✅ Obunani tekshirish", callback_data='check_sub')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Botdan foydalanish uchun quyidagi kanallarga obuna bo‘ling:", reply_markup=reply_markup)
+        await update.message.reply_text("🔔 Botdan foydalanish uchun quyidagi kanallarga obuna bo‘ling:", reply_markup=reply_markup)
 
 # Obunani tekshirish
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     user_id = query.from_user.id
     if all([await is_subscribed(user_id, context, channel) for channel in CHANNEL_USERNAMES]):
-        await query.answer("Rahmat! Siz kanallarga obuna bo‘lgansiz.")
-        await query.edit_message_text("Xush kelibsiz! Botdan foydalanish uchun raqam yuboring.")
+        await query.answer("✅ Rahmat! Siz kanallarga obuna bo‘lgansiz.")
+        await query.edit_message_text("🎉 Xush kelibsiz! Botdan foydalanish uchun raqam yuboring.")
     else:
-        await query.answer("Iltimos, barcha kanallarga obuna bo‘ling.", show_alert=True)
-        await query.edit_message_text("Iltimos, barcha kanallarga obuna bo‘ling.")
+        await query.answer("🚀 Iltimos, barcha kanallarga obuna bo‘ling.", show_alert=True)
+        await query.edit_message_text("📢 Iltimos, barcha kanallarga obuna bo‘ling.")
 
 # Raqam orqali kino ma’lumotlarini yuborish
 async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.from_user.id
     if not all([await is_subscribed(user_id, context, channel) for channel in CHANNEL_USERNAMES]):
-        await update.message.reply_text("Iltimos, avval barcha kanalga obuna bo‘ling.")
+        await update.message.reply_text("⚠️ Iltimos, avval barcha kanalga obuna bo‘ling.")
         return
     
     number = update.message.text.strip()
@@ -78,10 +83,10 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             json.dump(movies_data, file, ensure_ascii=False, indent=4)
 
         video_url = video_info["video_url"]
-        video_caption = f"📄 Kino nomi: {video_info['title']}\n👀 Ko‘rilganlar: {video_info['views']}"
+        video_caption = f"🎬 Kino nomi: {video_info['title']}\n👀 Ko‘rilganlar: {video_info['views']}"
         await update.message.reply_video(video=video_url, caption=video_caption)
     else:
-        await update.message.reply_text("Uzr, bu raqamga mos video topilmadi.")
+        await update.message.reply_text("❌ Uzr, bu raqamga mos video topilmadi.")
 
 # Botni ishga tushirish
 async def main():
@@ -93,11 +98,11 @@ async def main():
     application.add_handler(CallbackQueryHandler(check_subscription))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'^\d+$'), handle_number))
 
-    logging.info("Bot ishga tushdi...")
+    logging.info("🚀 Bot ishga tushdi...")
     await application.run_polling()
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Bot to‘xtatildi")
+        logging.info("🛑 Bot to‘xtatildi")
