@@ -2,56 +2,215 @@
     "1": {
         "title": "Chaqiruv",
         "video_url": "https://t.me/SLARK_MOVIE/194",
-        "views": 1
+        "views": 20
     },
     "2": {
         "title": "Forsaj 3",
         "video_url": "https://t.me/SLARK_MOVIE/193",
-        "views": 0
+        "views": 4
     },
     "3": {
         "title": "Ashvatxama",
         "video_url": "https://t.me/movies_kanal/3",
-        "views": 0
+        "views": 5
     },
     "4": {
         "title": "YIRTQICH 5",
         "video_url": "https://t.me/movies_kanal/4",
-        "views": 1
+        "views": 4
     },
     "5": {
         "title": "QOTIL",
         "video_url": "https://t.me/movies_kanal/6",
-        "views": 0
-    },
-    "6": {
-        "title": "QACHONKI HAYOT TUGAGANDA",
-        "video_url": "https://t.me/movies_kanal/7",
-        "views": 0
+        "views": 4
     },
     "7": {
         "title": "QINIDAN CHIQQAN PICHOQLAR",
         "video_url": "https://t.me/movies_kanal/8",
-        "views": 0
+        "views": 4
     },
     "8": {
         "title": "O'QITUVCHI",
         "video_url": "https://t.me/movies_kanal/9",
-        "views": 2
+        "views": 6
     },
     "9": {
         "title": "SONGI OLISHUV GLADIATOR",
         "video_url": "https://t.me/movies_kanal/10",
-        "views": 1
+        "views": 5
     },
     "10": {
         "title": "SOLNOMA",
         "video_url": "https://t.me/movies_kanal/11",
-        "views": 1
+        "views": 6
     },
     "11": {
         "title": "KING KONG SUYAKLAR OROLI",
         "video_url": "https://t.me/movies_kanal/12",
-        "views": 4
+        "views": 8
+    },
+    "12": {
+        "title": "Sehrli tushlar",
+        "video_url": "https://t.me/SLARK_MOVIE/192",
+        "views": 10
+    },
+    "13": {
+        "title": "Kelajak chegarasi",
+        "video_url": "https://t.me/SLARK_MOVIE/190",
+        "views": 9
+    },
+    "14": {
+        "title": "Kislata yomgiri",
+        "video_url": "https://t.me/SLARK_MOVIE/179",
+        "views": 2
+    },
+    "39": {
+        "title": "Prometey",
+        "video_url": "https://t.me/movies_kanal/15",
+        "views": 2
+    },
+    "48": {
+        "title": "Sonik 3",
+        "video_url": "https://t.me/movies_kanal/17",
+        "views": 14
+    },
+    "74": {
+        "title": "Bo'ysunmas 2",
+        "video_url": "https://t.me/movies_kanal/18",
+        "views": 0
+    },
+    "86": {
+        "title": "Transformerlar 1",
+        "video_url": "https://t.me/movies_kanal/19",
+        "views": 0
+    },
+    "100": {
+        "title": "Sirli yilnoma",
+        "video_url": "https://t.me/movies_kanal/23",
+        "views": 1
+    },
+    "134": {
+        "title": "Qizil topshiriq",
+        "video_url": "https://t.me/movies_kanal/36",
+        "views": 8
+    },
+    "497": {
+        "title": "Yolg'iz",
+        "video_url": "https://t.me/movies_kanal/25",
+        "views": 11
+    },
+    "77": {
+        "title": "Squid games",
+        "parts": 7,
+        "part_data": [
+            {
+                "part_name": "Squid games 1-qism",
+                "part_url": "https://t.me/movies_kanal/26"
+            },
+            {
+                "part_name": "Squid games 2-qism",
+                "part_url": "https://t.me/movies_kanal/30"
+            },
+            {
+                "part_name": "Squid games 3-qism",
+                "part_url": "https://t.me/movies_kanal/31"
+            },
+            {
+                "part_name": "Squid games 4-qism",
+                "part_url": "https://t.me/movies_kanal/32"
+            },
+            {
+                "part_name": "Squid games 5-qism",
+                "part_url": "https://t.me/movies_kanal/33"
+            },
+            {
+                "part_name": "Squid games 6-qism",
+                "part_url": "https://t.me/movies_kanal/34"
+            },
+            {
+                "part_name": "Squid games 7-qism",
+                "part_url": "https://t.me/movies_kanal/35"
+            }
+        ],
+        "views": 9
+    },
+    "227": {
+        "title": "Qora pantera",
+        "video_url": "https://t.me/movies_kanal/37",
+        "views": 5
+    },
+    "90": {
+        "title": "Kuzatuvchilar",
+        "video_url": "https://t.me/movies_kanal/38",
+        "views": 5
+    },
+    "346": {
+        "title": "Afsona",
+        "video_url": "https://t.me/movies_kanal/39",
+        "views": 10
+    },
+    "715": {
+        "title": "Maxsus kuchlar",
+        "video_url": "https://t.me/movies_kanal/40",
+        "views": 26
+    },
+    "115": {
+        "title": "Vechnie",
+        "video_url": "https://t.me/movies_kanal/42",
+        "views": 0
+    },
+    "33": {
+        "title": "Venom",
+        "parts": 3,
+        "part_data": [
+            {
+                "part_name": "Venom 1",
+                "part_url": "https://t.me/movies_kanal/43"
+            },
+            {
+                "part_name": "Venom 2",
+                "part_url": "https://t.me/movies_kanal/44"
+            },
+            {
+                "part_name": "Venom 3",
+                "part_url": "https://t.me/movies_kanal/45"
+            }
+        ],
+        "views": 2
+    },
+    "729": {
+        "title": "Samodagi o'g'irlik",
+        "video_url": "https://t.me/movies_kanal/46",
+        "views": 0
+    },
+    "847": {
+        "title": "Yirtqich",
+        "video_url": "https://t.me/movies_kanal/47",
+        "views": 3
+    },
+    "172": {
+        "title": "Ajdar bo'ysindiruvchi \nTREYLER CHIQISHI BILAN BOTGA JOYLANADI.",
+        "video_url": "https://t.me/movies_kanal/49",
+        "views": 2
+    },
+    "130": {
+        "title": "Fortuna operatsiyasi",
+        "video_url": "https://t.me/movies_kanal/50",
+        "views": 1
+    },
+    "777": {
+        "title": "SUBSTANSIYA",
+        "video_url": "https://t.me/movies_kanal/51",
+        "views": 2
+    },
+    "342": {
+        "title": "Mening aybim 2",
+        "video_url": "https://t.me/movies_kanal/52",
+        "views": 0
+    },
+    "539": {
+        "title": "Zombi apokalipsis va o'limdan oldin 100 ta narsa ro'yxati",
+        "video_url": "https://t.me/movies_kanal/54",
+        "views": 0
     }
 }
