@@ -1,7 +1,6 @@
 import logging
 import json
 import asyncio
-import nest_asyncio
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
@@ -13,24 +12,13 @@ from telegram.ext import (
     ConversationHandler,
 )
 from telegram.constants import ChatMemberStatus
-from dotenv import load_dotenv
 import os
-
-# .env faylidan ma'lumotlarni yuklash
-load_dotenv()
-
-# nest_asyncio ni faollashtirish (Replit, Koyeb kabi platformalar uchun)
-nest_asyncio.apply()
-
-# Bot tokeni, admin ID lar va bildirishnoma kanali ID si
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # .env faylidan o'qiladi
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS").split(",")))  # .env faylidan o'qiladi
-NOTIFICATION_CHANNEL_ID = os.getenv("NOTIFICATION_CHANNEL_ID")  # .env faylidan kanal ID sini o'qish
 
 # Logger sozlamalari
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 # JSON fayllarni o'qish
 def load_json(filename):
@@ -73,9 +61,8 @@ BROADCAST_MESSAGE = 10  # Xabar yuborish uchun yangi holat
 # Obunani tekshirish (yopiq kanallarga ham ishlaydi)
 async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channel_url: str) -> bool:
     try:
-        # Kanal URL dan chat ID sini olish
         chat = await context.bot.get_chat(channel_url)
-        chat_id = chat.id  # Kanalning to‘liq ID si (private yoki public)
+        chat_id = chat.id
         logging.info(f"Kanal topildi: ID={chat_id}, URL={channel_url}")
 
         chat_member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
@@ -91,7 +78,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     first_name = update.message.from_user.first_name or "Noma'lum"
     profile_url = f"https://t.me/{username}" if username != "Noma'lum" else f"tg://user?id={user_id}"
 
-    # Yangi foydalanuvchini qo'shish va kanalga xabar yuborish
     if str(user_id) not in users_data:
         users_data[str(user_id)] = {
             "username": username,
@@ -101,21 +87,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         save_users(users_data)
 
         # Kanalga xabar yuborish
-        notification_message = (
-            f"Yangi foydalanuvchi qo'shildi!\n"
-            f"Ism: {first_name}\n"
-            f"Username: @{username}\n"
-            f"Profil: {profile_url}"
-        )
-        try:
-            await context.bot.send_message(
-                chat_id=NOTIFICATION_CHANNEL_ID,
-                text=notification_message
+        notification_channel_id = os.environ.get("NOTIFICATION_CHANNEL_ID")
+        if notification_channel_id:
+            notification_message = (
+                f"Yangi foydalanuvchi qo'shildi!\n"
+                f"Ism: {first_name}\n"
+                f"Username: @{username}\n"
+                f"Profil: {profile_url}"
             )
-        except Exception as e:
-            logging.error(f"Kanalga xabar yuborishda xatolik: {e}")
+            try:
+                await context.bot.send_message(
+                    chat_id=notification_channel_id,
+                    text=notification_message
+                )
+            except Exception as e:
+                logging.error(f"Kanalga xabar yuborishda xatolik: {e}")
 
-    if user_id in ADMIN_IDS:  # Admin ID lar ro'yxatida tekshirish
+    if user_id in [int(id) for id in os.environ.get("ADMIN_IDS", "").split(",") if id.strip()]:  # Admin ID lar ro'yxatida tekshirish
         keyboard = [
             [InlineKeyboardButton("🎮 Qismli kino qo‘shish", callback_data="add_movie_parts")],
             [InlineKeyboardButton("🎬 Oddiy kino qo‘shish", callback_data="add_simple_movie")],
@@ -168,7 +156,6 @@ async def show_user_count(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if query:
         await query.edit_message_text(f"Botdan foydalanuvchilar soni: {user_count}")
     else:
-        # Agar query yo‘q bo‘lsa, oddiy xabar yuborish
         await update.message.reply_text(f"Botdan foydalanuvchilar soni: {user_count}")
 
 # Foydalanuvchilarga xabar yuborish jarayonini boshlash
@@ -176,7 +163,8 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    if user_id not in ADMIN_IDS:
+    admin_ids = [int(id) for id in os.environ.get("ADMIN_IDS", "").split(",") if id.strip()]
+    if user_id not in admin_ids:
         await query.edit_message_text("Siz admin emassiz!")
         return ConversationHandler.END
 
@@ -352,7 +340,8 @@ async def confirm_delete_movie(update: Update, context: ContextTypes.DEFAULT_TYP
 # Kanal qo‘shish
 async def add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.from_user.id
-    if user_id not in ADMIN_IDS:
+    admin_ids = [int(id) for id in os.environ.get("ADMIN_IDS", "").split(",") if id.strip()]
+    if user_id not in admin_ids:
         return
 
     new_channel = update.message.text.strip()
@@ -364,7 +353,7 @@ async def add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("Bu kanal allaqachon qo‘shilgan.")
         return
 
-    CHANNEL_USERNAMES.append(new_channel)
+    CHANNEL_USERNAMES.append(normalize_channel_url(new_channel))
     save_json("channels.json", CHANNEL_USERNAMES)
     await update.message.reply_text(f"✅ Kanal qo‘shildi: {new_channel}")
 
@@ -373,7 +362,8 @@ async def remove_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    if user_id not in ADMIN_IDS:
+    admin_ids = [int(id) for id in os.environ.get("ADMIN_IDS", "").split(",") if id.strip()]
+    if user_id not in admin_ids:
         await query.edit_message_text("Siz admin emassiz!")
         return ConversationHandler.END
 
@@ -478,9 +468,24 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     else:
         await update.message.reply_text("Uzr, bu raqamga mos video topilmadi.")
 
-# Botni ishga tushirish (polling timeout qo‘shilgan)
+# Botni webhook orqali ishga tushirish
 async def main() -> None:
-    application = Application.builder().token(BOT_TOKEN).read_timeout(10).write_timeout(10).build()
+    bot_token = os.environ.get("BOT_TOKEN")
+    if not bot_token:
+        logger.error("BOT_TOKEN environment o'zgaruvchisi topilmadi!")
+        return
+
+    application = Application.builder().token(bot_token).read_timeout(10).write_timeout(10).build()
+
+    # Webhook sozlamalari (Railway domeni bilan)
+    port = int(os.environ.get("PORT", 8080))
+    webhook_url = f"https://{os.environ.get('RAILWAY_STATIC_URL', 'your-domain.up.railway.app')}/webhook"
+    await application.bot.set_webhook(url=webhook_url)
+
+    # Handler'lar
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(check_subscription, pattern="check_sub"))
+    application.add_handler(CallbackQueryHandler(show_user_count, pattern="user_count"))
 
     # ConversationHandler for adding movies with parts
     conv_handler_parts = ConversationHandler(
@@ -537,9 +542,6 @@ async def main() -> None:
         fallbacks=[],
     )
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(check_subscription, pattern="check_sub"))
-    application.add_handler(CallbackQueryHandler(show_user_count, pattern="user_count"))
     application.add_handler(conv_handler_parts)
     application.add_handler(conv_handler_simple)
     application.add_handler(conv_handler_delete)
@@ -548,7 +550,14 @@ async def main() -> None:
     application.add_handler(CallbackQueryHandler(admin_panel))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d+$"), handle_number))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^@"), add_channel))
-    await application.run_polling()
+
+    # Webhook orqali ishga tushirish
+    await application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path="/webhook",
+        secret_token="your_secret_token"  # Opsiyonal, xavfsizlik uchun
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
