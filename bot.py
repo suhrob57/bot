@@ -158,7 +158,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = query.from_user.id
     is_all_subscribed = all([await is_subscribed(user_id, context, channel) for channel in CHANNELS])
     if is_all_subscribed:
-        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanishingiz mumkin.")
+        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanish mumkin.")
     else:
         await query.edit_message_text("❌ Siz hali barcha kanallarga obuna bo‘lmagansiz. Iltimos, obuna bo‘ling.")
 
@@ -834,10 +834,6 @@ async def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_part_selection, pattern="^part_"))
     application.add_handler(CallbackQueryHandler(admin_panel))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d+$"), handle_number))
-
-    # Flask ilovasini ishga tushirish
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     # Vaqt mintaqasini aniq belgilash
