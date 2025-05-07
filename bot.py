@@ -16,6 +16,10 @@ from telegram.constants import ChatMemberStatus
 from dotenv import load_dotenv
 import os
 import pytz
+from flask import Flask, request
+
+# Flask ilovasini yaratish
+app = Flask(__name__)
 
 # .env faylidan ma'lumotlarni yuklash
 load_dotenv()
@@ -55,14 +59,14 @@ def save_users(users):
     save_json("users.json", users)
 
 # ConversationHandler uchun holatlar
-MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_NAME, MOVIE_PART_URL, MOVIE_NUMBER = range(5)
-SIMPLE_MOVIE_TITLE, SIMPLE_MOVIE_URL, SIMPLE_MOVIE_NUMBER = range(5, 8)
-DELETE_MOVIE = 8
-REMOVE_CHANNEL = 9
-BROADCAST_MESSAGE = 10
-ADD_CHANNEL_TYPE, ADD_CHANNEL_ID = range(11, 13)
-ADD_NEW_PART_SELECT, ADD_NEW_PART_NAME, ADD_NEW_PART_URL = range(18, 21)
-POST_TO_CHANNEL, POST_TYPE, POST_TEXT, POST_MEDIA, POST_BUTTON_TEXT, POST_BUTTON_URL = range(21, 27)
+MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_URL, MOVIE_NUMBER = range(4)
+SIMPLE_MOVIE_TITLE, SIMPLE_MOVIE_URL, SIMPLE_MOVIE_NUMBER = range(4, 7)
+DELETE_MOVIE = 7
+REMOVE_CHANNEL = 8
+BROADCAST_MESSAGE = 9
+ADD_CHANNEL_TYPE, ADD_CHANNEL_ID = range(10, 12)
+ADD_NEW_PART_SELECT, ADD_NEW_PART_NAME, ADD_NEW_PART_URL = range(15, 18)
+POST_TO_CHANNEL, POST_TYPE, POST_TEXT, POST_MEDIA, POST_BUTTON_TEXT, POST_BUTTON_URL = range(18, 24)
 
 # Obunani tekshirish (username yoki chat_id asosida)
 async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channel) -> bool:
@@ -257,33 +261,26 @@ async def movie_parts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data["movie_parts"] = parts
         context.user_data["current_part"] = 1
         context.user_data["movie_part_data"] = []
-        await update.message.reply_text("1-qism nomini kiriting:")
-        return MOVIE_PART_NAME
+        await update.message.reply_text("1-qism URL manzilini kiriting:")
+        return MOVIE_PART_URL
     except ValueError:
         await update.message.reply_text("Xatolik! Iltimos, to‘g‘ri raqam kiriting:")
         return MOVIE_PARTS
-
-# Kino qo‘shish: Har bir qism nomini so'rash
-async def movie_part_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    part_name = update.message.text
-    context.user_data["current_part_name"] = part_name
-    await update.message.reply_text(f"{context.user_data['current_part']}-qism URL manzilini kiriting:")
-    return MOVIE_PART_URL
 
 # Kino qo‘shish: Har bir qismning URL manzilini so'rash
 async def movie_part_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     part_url = update.message.text
     current_part = context.user_data["current_part"]
     part_data = {
-        "part_name": context.user_data["current_part_name"],
+        "part_name": f"{current_part}-qism",
         "part_url": part_url,
     }
     context.user_data["movie_part_data"].append(part_data)
 
     if current_part < context.user_data["movie_parts"]:
         context.user_data["current_part"] += 1
-        await update.message.reply_text(f"{context.user_data['current_part']}-qism nomini kiriting:")
-        return MOVIE_PART_NAME
+        await update.message.reply_text(f"{context.user_data['current_part']}-qism URL manzilini kiriting:")
+        return MOVIE_PART_URL
     else:
         await update.message.reply_text("Anime raqamini kiriting:")
         return MOVIE_NUMBER
@@ -489,7 +486,7 @@ async def confirm_delete_channel(update: Update, context: ContextTypes.DEFAULT_T
 async def cancel_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Kanalni o'chirish be  bekor qilindi.")
+    await query.edit_message_text("Kanalni o'chirish bekor qilindi.")
     return ConversationHandler.END
 
 # Broadcast jarayonini boshlash
@@ -729,8 +726,16 @@ async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         await query.edit_message_text("Qism topilmadi!")
 
+# Webhook so'rovlarini qabul qilish uchun endpoint
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    update = Update.de_json(request.get_json(), application.bot)
+    await application.process_update(update)
+    return 'OK'
+
 # Botni ishga tushirish
 async def main() -> None:
+    global application
     application = Application.builder().token(BOT_TOKEN).build()
 
     conv_handler_parts = ConversationHandler(
@@ -738,7 +743,6 @@ async def main() -> None:
         states={
             MOVIE_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_title)],
             MOVIE_PARTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_parts)],
-            MOVIE_PART_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_part_name)],
             MOVIE_PART_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_part_url)],
             MOVIE_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_number)],
         },
@@ -831,7 +835,9 @@ async def main() -> None:
     application.add_handler(CallbackQueryHandler(admin_panel))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d+$"), handle_number))
 
-    await application.run_polling()
+    # Flask ilovasini ishga tushirish
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     # Vaqt mintaqasini aniq belgilash
