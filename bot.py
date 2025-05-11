@@ -33,7 +33,7 @@ PORT = int(os.getenv("PORT", 10000))  # Renderda PORT muhit o'zgaruvchisi
 
 # Logger sozlamalari
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # JSON fayllarni o'qish (Render uchun disk yo'li)
