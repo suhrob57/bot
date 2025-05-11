@@ -39,16 +39,51 @@ logging.basicConfig(
 # JSON fayllarni o'qish (Render uchun disk yo'li)
 def load_json(filename):
     try:
-        filepath = os.path.join("/opt/render/project", filename)
-        with open(filepath, "r", encoding="utf-8") as file:
-            return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
+        # Joriy papka va Render standart yo'llarini tekshirish
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths = [
+            os.path.join(current_dir, filename),                    # Joriy papka
+            os.path.join("/opt/render/project/src", filename),      # Render uchun standart yo'l
+            os.path.join("/opt/render/project", filename),          # Yana bir alternativa
+            filename                                                # Nisbiy yo'l
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                logging.info(f"{filename} fayli topildi: {path}")
+                with open(path, "r", encoding="utf-8") as file:
+                    return json.load(file)
+
+        raise FileNotFoundError(f"{filename} fayli hech qayerda topilmadi.")
+
+    except FileNotFoundError as e:
+        logging.error(f"{filename} fayli topilmadi: {e}")
         return {} if filename in ["movies.json", "users.json"] else []
 
+    except json.JSONDecodeError as e:
+        logging.error(f"{filename} faylida JSON formati xato: {e}")
+        return {} if filename in ["movies.json", "users.json"] else []
+
+
 def save_json(filename, data):
-    filepath = os.path.join("/opt/render/project", filename)
-    with open(filepath, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths = [
+            os.path.join(current_dir, filename),
+            os.path.join("/opt/render/project/src", filename),
+            os.path.join("/opt/render/project", filename),
+        ]
+        # Birinchi topilgan yo'lga saqlash
+        for path in possible_paths:
+            dir_path = os.path.dirname(path)
+            if os.path.exists(dir_path):
+                with open(path, "w", encoding="utf-8") as file:
+                    json.dump(data, file, ensure_ascii=False, indent=4)
+                logging.info(f"{filename} fayliga yozildi: {path}")
+                return
+        logging.error(f"{filename} faylini saqlash uchun papka topilmadi.")
+    except Exception as e:
+        logging.error(f"{filename} fayliga yozishda xatolik: {e}")
 
 # Fayllarni yuklash
 movies_data = load_json("movies.json")
