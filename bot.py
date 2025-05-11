@@ -32,7 +32,7 @@ PORT = int(os.getenv("PORT", 10000))  # Renderda PORT muhit o'zgaruvchisi
 
 # Logger sozlamalari
 logging.basicConfig(
-    level=logging.INFO,  # DEBUG o'rniga INFO, muhim ma'lumotlarni ko'rsatish uchun
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
@@ -174,7 +174,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = query.from_user.id
     is_all_subscribed = all([await is_subscribed(user_id, context, channel) for channel in CHANNELS])
     if is_all_subscribed:
-        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanishingiz mumkin.")
+        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanishiz mumkin.")
     else:
         await query.edit_message_text("❌ Siz hali barcha kanallarga obuna bo‘lmagansiz. Iltimos, obuna bo‘ling.")
 
@@ -767,9 +767,7 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("Uzr, bu raqamga mos Anime topilmadi.")
 
 # Qism tanlash tugmasi
-async def handle
-
-_part_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
