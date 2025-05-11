@@ -3,8 +3,7 @@ import json
 import asyncio
 import nest_asyncio
 import os
-import sys
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -33,57 +32,37 @@ PORT = int(os.getenv("PORT", 10000))  # Renderda PORT muhit o'zgaruvchisi
 
 # Logger sozlamalari
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,  # DEBUG o'rniga INFO, muhim ma'lumotlarni ko'rsatish uchun
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-# JSON fayllarni o'qish (Render uchun disk yo'li)
+# JSON fayllarni o'qish
 def load_json(filename):
     try:
-        # Joriy papka va Render standart yo'llarini tekshirish
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        possible_paths = [
-            os.path.join(current_dir, filename),                    # Joriy papka
-            os.path.join("/opt/render/project", filename),      # Render uchun standart yo'l
-            os.path.join("/opt/render/project", filename),          # Yana bir alternativa
-            filename                                                # Nisbiy yo'l
-        ]
-
-        for path in possible_paths:
-            if os.path.exists(path):
-                logging.info(f"{filename} fayli topildi: {path}")
-                with open(path, "r", encoding="utf-8") as file:
-                    return json.load(file)
-
-        raise FileNotFoundError(f"{filename} fayli hech qayerda topilmadi.")
-
+        file_path = os.path.join("/opt/render/project/src", filename)
+        logging.info(f"{filename} faylini {file_path} dan o'qishga harakat qilmoqda...")
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as file:
+                return json.load(file)
+        raise FileNotFoundError(f"{filename} fayli {file_path} da topilmadi.")
     except FileNotFoundError as e:
         logging.error(f"{filename} fayli topilmadi: {e}")
         return {} if filename in ["movies.json", "users.json"] else []
-
     except json.JSONDecodeError as e:
         logging.error(f"{filename} faylida JSON formati xato: {e}")
         return {} if filename in ["movies.json", "users.json"] else []
 
-
+# JSON fayllarni saqlash
 def save_json(filename, data):
     try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        possible_paths = [
-            os.path.join(current_dir, filename),
-            os.path.join("/opt/render/project", filename),
-            os.path.join("/opt/render/project", filename),
-        ]
-        # Birinchi topilgan yo'lga saqlash
-        for path in possible_paths:
-            dir_path = os.path.dirname(path)
-            if os.path.exists(dir_path):
-                with open(path, "w", encoding="utf-8") as file:
-                    json.dump(data, file, ensure_ascii=False, indent=4)
-                logging.info(f"{filename} fayliga yozildi: {path}")
-                return
-        logging.error(f"{filename} faylini saqlash uchun papka topilmadi.")
+        file_path = os.path.join("/opt/render/project/src", filename)
+        logging.info(f"{filename} faylini {file_path} ga saqlashga harakat qilmoqda...")
+        with open(file_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+        logging.info(f"{filename} fayliga muvaffaqiyatli yozildi: {file_path}")
     except Exception as e:
         logging.error(f"{filename} fayliga yozishda xatolik: {e}")
+        raise
 
 # Fayllarni yuklash
 movies_data = load_json("movies.json")
@@ -95,7 +74,7 @@ def save_users(users):
     save_json("users.json", users)
 
 # ConversationHandler uchun holatlar
-MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_URL, MOVIE_NUMBER = range(4)  # MOVIE_PART_NAME olib tashlandi
+MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_URL, MOVIE_NUMBER = range(4)
 SIMPLE_MOVIE_TITLE, SIMPLE_MOVIE_URL, SIMPLE_MOVIE_NUMBER = range(4, 7)
 DELETE_MOVIE = 7
 REMOVE_CHANNEL = 8
@@ -104,19 +83,19 @@ ADD_CHANNEL_TYPE, ADD_CHANNEL_ID = range(10, 12)
 ADD_NEW_PART_SELECT, ADD_NEW_PART_NAME, ADD_NEW_PART_URL = range(17, 20)
 POST_TO_CHANNEL, POST_TYPE, POST_TEXT, POST_MEDIA, POST_BUTTON_TEXT, POST_BUTTON_URL = range(20, 26)
 
-# Obunani tekshirish (username yoki chat_id asosida)
+# Obunani tekshirish
 async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channel) -> bool:
     try:
         if isinstance(channel, str) and channel.startswith("@"):  # Public kanal
             chat_member = await context.bot.get_chat_member(chat_id=channel, user_id=user_id)
-        else:  # Private kanal (chat_id ishlatiladi)
+        else:  # Private kanal
             chat_member = await context.bot.get_chat_member(chat_id=channel, user_id=user_id)
         return chat_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
         logging.error(f"Obunani tekshirishda xatolik: {e}")
         return False
 
-# Kanal ID-sini aniqlash funksiyasi
+# Kanal ID-sini aniqlash
 async def get_channel_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         logging.debug("Update obyektida xabar mavjud emas.")
@@ -168,7 +147,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             [InlineKeyboardButton("📤 Kanalga post yuborish", callback_data="post_to_channel")],
             [InlineKeyboardButton("👥 Foydalanuvchilar soni", callback_data="user_count")],
             [InlineKeyboardButton("📩 Foydalanuvchilarga xabar yuborish", callback_data="broadcast")],
-            [InlineKeyboardButton("🔄 Botni qayta ishga tushirish", callback_data="restart_bot")],  # Yangi tugma
+            [InlineKeyboardButton("🔄 Botni qayta ishga tushirish", callback_data="restart_bot")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Admin paneliga xush kelibsiz!", reply_markup=reply_markup)
@@ -295,7 +274,6 @@ async def restart_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     await query.edit_message_text("Bot qayta ishga tushirilmoqda...")
-    # Renderda jarayonni qayta boshlash uchun
     os._exit(0)
 
 # Kino qo‘shish: Kino nomini so'rash
@@ -313,7 +291,6 @@ async def movie_parts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data["movie_parts"] = parts
         context.user_data["current_part"] = 1
         context.user_data["movie_part_data"] = []
-        # Qism nomlarini avtomatik yaratish
         for i in range(1, parts + 1):
             context.user_data["movie_part_data"].append({
                 "part_name": f"{i}-qism",
@@ -328,7 +305,7 @@ async def movie_parts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 # Kino qo‘shish: Har bir qismning URL manzilini so'rash
 async def movie_part_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     part_url = update.message.text
-    current_part = context.user_data["current_part"] - 1  # Indeks 0 dan boshlanadi
+    current_part = context.user_data["current_part"] - 1
     context.user_data["movie_part_data"][current_part]["part_url"] = part_url
 
     if context.user_data["current_part"] < context.user_data["movie_parts"]:
@@ -437,6 +414,7 @@ async def channel_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     query = update.callback_query
     await query.answer()
     context.user_data["channel_type"] = query.data
+    logging.info(f"Kanal turi tanlandi: {query.data}")
 
     if query.data == "public_channel":
         await query.message.reply_text("Public kanal username’ni @belgisi bilan kiriting (masalan: @channelname):")
@@ -453,6 +431,7 @@ async def add_channel_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     channel_input = update.message.text.strip()
     channel_type = context.user_data.get("channel_type")
+    logging.info(f"Kanal kiritildi: {channel_input}, turi: {channel_type}")
 
     if channel_type == "public_channel":
         if not channel_input.startswith("@"):
@@ -473,9 +452,16 @@ async def add_channel_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Bu kanal allaqachon qo‘shilgan.")
         return ConversationHandler.END
 
-    CHANNELS.append(channel)
-    save_json("channels.json", CHANNELS)
-    await update.message.reply_text(f"✅ Kanal qo‘shildi: {channel}")
+    try:
+        CHANNELS.append(channel)
+        save_json("channels.json", CHANNELS)
+        await update.message.reply_text(f"✅ Kanal qo‘shildi: {channel}")
+        logging.info(f"Kanal muvaffaqiyatli qo‘shildi: {channel}")
+    except Exception as e:
+        logging.error(f"Kanalni saqlashda xatolik: {e}")
+        await update.message.reply_text(f"❌ Kanalni saqlashda xatolik yuz berdi: {str(e)}")
+        return ConversationHandler.END
+
     return ConversationHandler.END
 
 # Kanalni o'chirish
@@ -722,38 +708,33 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     video_info = movies_data.get(number)
     if video_info:
         if "part_data" in video_info and video_info["part_data"]:
-            # Birinchi qismni yuborish
             first_part = video_info["part_data"][0]
-            # Sahifalash uchun ma'lumotlarni saqlash
-            context.user_data["current_page"] = 0  # Birinchi sahifa
+            context.user_data["current_page"] = 0
             context.user_data["movie_number"] = number
-            context.user_data["selected_part_index"] = 0  # Birinchi qism tanlangan
+            context.user_data["selected_part_index"] = 0
 
-            # Tugmalarni sahifalash bilan yaratish
             parts = video_info["part_data"]
-            parts_per_page = 5  # Har bir sahifada 5 ta qism
+            parts_per_page = 5
             start_idx = context.user_data["current_page"] * parts_per_page
             end_idx = start_idx + parts_per_page
             visible_parts = parts[start_idx:end_idx]
 
-            # Tugmalar ro'yxatini tayyorlash (tanlangan qismdan tashqari)
             keyboard = []
             current_row = []
             for i, part in enumerate(parts):
-                if i != 0:  # Birinchi qismni o'tkazib yuboramiz (hozir ko'rsatilmoqda)
+                if i != 0:
                     if start_idx <= i < end_idx:
                         current_row.append(InlineKeyboardButton(
                             f"{part['part_name']}", callback_data=f"part_{number}_{i}"
                         ))
-                        if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+                        if len(current_row) == 5:
                             keyboard.append(current_row)
                             current_row = []
-            if current_row:  # Qolgan tugmalarni qatorga qo'shish
+            if current_row:
                 keyboard.append(current_row)
 
-            # Navigatsiya tugmalari
             nav_row = []
-            total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page  # Sahifalar soni
+            total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page
             if context.user_data["current_page"] > 0:
                 nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{number}_prev"))
             if context.user_data["current_page"] < total_pages - 1:
@@ -762,13 +743,11 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 keyboard.append(nav_row)
 
             reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-            # Video xabarini yuborish
             message = await update.message.reply_video(
                 video=first_part["part_url"],
                 caption=f"📄 Anime nomi: {video_info['title']}\n🔗 Qism: {first_part['part_name']}\n👁 Ko‘rilganlar: {video_info['views']}",
                 reply_markup=reply_markup
             )
-            # Xabar ID sini saqlash
             context.user_data["last_message_id"] = message.message_id
             context.user_data["last_chat_id"] = message.chat_id
             context.user_data["last_movie_number"] = number
@@ -788,7 +767,9 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("Uzr, bu raqamga mos Anime topilmadi.")
 
 # Qism tanlash tugmasi
-async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle
+
+_part_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -803,7 +784,6 @@ async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
     video_info = movies_data.get(movie_number)
     if video_info and "part_data" in video_info and part_index < len(video_info["part_data"]):
-        # Avvalgi xabarni tahrirlash (tugmalarni olib tashlash)
         last_message_id = context.user_data.get("last_message_id")
         last_chat_id = context.user_data.get("last_chat_id")
         if last_message_id and last_chat_id:
@@ -816,36 +796,32 @@ async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TY
             except Exception as e:
                 logging.error(f"Avvalgi xabarni tahrirlashda xatolik: {e}")
 
-        # Tanlangan qismni yuborish
         part = video_info["part_data"][part_index]
-        context.user_data["selected_part_index"] = part_index  # Tanlangan qism indeksini saqlash
+        context.user_data["selected_part_index"] = part_index
 
-        # Tugmalarni sahifalash bilan yaratish
         parts = video_info["part_data"]
-        parts_per_page = 5  # Har bir sahifada 5 ta qism
+        parts_per_page = 5
         current_page = context.user_data.get("current_page", 0)
         start_idx = current_page * parts_per_page
         end_idx = start_idx + parts_per_page
         visible_parts = parts[start_idx:end_idx]
 
-        # Tugmalar ro'yxatini tayyorlash (tanlangan qismdan tashqari)
         keyboard = []
         current_row = []
         for i, part in enumerate(parts):
-            if i != part_index:  # Tanlangan qismni o'tkazib yuboramiz
+            if i != part_index:
                 if start_idx <= i < end_idx:
                     current_row.append(InlineKeyboardButton(
                         f"{part['part_name']}", callback_data=f"part_{movie_number}_{i}"
                     ))
-                    if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+                    if len(current_row) == 5:
                         keyboard.append(current_row)
                         current_row = []
-        if current_row:  # Qolgan tugmalarni qatorga qo'shish
+        if current_row:
             keyboard.append(current_row)
 
-        # Navigatsiya tugmalari
         nav_row = []
-        total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page  # Sahifalar soni
+        total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page
         if current_page > 0:
             nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{movie_number}_prev"))
         if current_page < total_pages - 1:
@@ -854,13 +830,11 @@ async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TY
             keyboard.append(nav_row)
 
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-        # Yangi video xabarini yuborish
         message = await query.message.reply_video(
             video=part["part_url"],
             caption=f"📄 Anime nomi: {video_info['title']}\n🔗 Qism: {part['part_name']}\n👁 Ko‘rilganlar: {video_info['views']}",
             reply_markup=reply_markup
         )
-        # Yangi xabar ID sini saqlash
         context.user_data["last_message_id"] = message.message_id
         context.user_data["last_chat_id"] = message.chat_id
         context.user_data["last_movie_number"] = movie_number
@@ -877,14 +851,13 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     data = query.data.split("_")
     movie_number = data[1]
-    action = data[2]  # "prev" yoki "next"
+    action = data[2]
 
     video_info = movies_data.get(movie_number)
     if not video_info or "part_data" not in video_info:
         await query.message.reply_text("❌ Boshqa qism topilmadi!")
         return
 
-    # Sahifani yangilash
     current_page = context.user_data.get("current_page", 0)
     parts = video_info["part_data"]
     parts_per_page = 5
@@ -895,7 +868,6 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     elif action == "next" and current_page < total_pages - 1:
         context.user_data["current_page"] += 1
 
-    # Yangi tugmalar ro'yxatini yaratish
     current_page = context.user_data["current_page"]
     start_idx = current_page * parts_per_page
     end_idx = start_idx + parts_per_page
@@ -905,7 +877,7 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     keyboard = []
     current_row = []
     for i, part in enumerate(parts):
-        if i != selected_part_index:  # Tanlangan qismni o'tkazib yuboramiz
+        if i != selected_part_index:
             if start_idx <= i < end_idx:
                 current_row.append(InlineKeyboardButton(
                     f"{part['part_name']}", callback_data=f"part_{movie_number}_{i}"
@@ -916,7 +888,6 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if current_row:
         keyboard.append(current_row)
 
-    # Navigatsiya tugmalari
     nav_row = []
     if current_page > 0:
         nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{movie_number}_prev"))
@@ -926,7 +897,6 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         keyboard.append(nav_row)
 
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-    # Avvalgi xabarni tahrirlash
     try:
         await context.bot.edit_message_reply_markup(
             chat_id=context.user_data["last_chat_id"],
@@ -949,82 +919,89 @@ async def main() -> None:
     application = Application.builder().token(BOT_TOKEN).build()
 
     conv_handler_parts = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_panel, pattern="add_movie_parts")],
+        entry_points=[CallbackQueryHandler(admin_panel, pattern="^add_movie_parts$")],
         states={
             MOVIE_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_title)],
             MOVIE_PARTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_parts)],
             MOVIE_PART_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_part_url)],
             MOVIE_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_number)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_simple = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_panel, pattern="add_simple_movie")],
+        entry_points=[CallbackQueryHandler(admin_panel, pattern="^add_simple_movie$")],
         states={
             SIMPLE_MOVIE_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, simple_movie_title)],
             SIMPLE_MOVIE_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, simple_movie_url)],
             SIMPLE_MOVIE_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, simple_movie_number)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_delete = ConversationHandler(
-        entry_points=[CallbackQueryHandler(delete_movie, pattern="delete_movie")],
+        entry_points=[CallbackQueryHandler(delete_movie, pattern="^delete_movie$")],
         states={
             DELETE_MOVIE: [CallbackQueryHandler(confirm_delete_movie, pattern="^delete_")],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_remove_channel = ConversationHandler(
-        entry_points=[CallbackQueryHandler(remove_channel, pattern="remove_channel")],
+        entry_points=[CallbackQueryHandler(remove_channel, pattern="^remove_channel$")],
         states={
             REMOVE_CHANNEL: [
                 CallbackQueryHandler(select_channel, pattern="^select_"),
                 CallbackQueryHandler(confirm_delete_channel, pattern="^confirm_delete_"),
-                CallbackQueryHandler(cancel_delete, pattern="cancel_delete"),
+                CallbackQueryHandler(cancel_delete, pattern="^cancel_delete$"),
             ],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_broadcast = ConversationHandler(
-        entry_points=[CallbackQueryHandler(broadcast, pattern="broadcast")],
+        entry_points=[CallbackQueryHandler(broadcast, pattern="^broadcast$")],
         states={
             BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_broadcast_message)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_add_channel = ConversationHandler(
-        entry_points=[CallbackQueryHandler(add_channel, pattern="add_channel")],
+        entry_points=[CallbackQueryHandler(add_channel, pattern="^add_channel$")],
         states={
             ADD_CHANNEL_TYPE: [CallbackQueryHandler(channel_type, pattern="^(public_channel|private_channel)$")],
             ADD_CHANNEL_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_channel_id)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_add_new_part = ConversationHandler(
-        entry_points=[CallbackQueryHandler(add_new_part, pattern="add_new_part")],
+        entry_points=[CallbackQueryHandler(add_new_part, pattern="^add_new_part$")],
         states={
             ADD_NEW_PART_SELECT: [CallbackQueryHandler(select_movie_for_new_part, pattern="^add_part_")],
             ADD_NEW_PART_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_new_part_name)],
             ADD_NEW_PART_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_new_part_url)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     conv_handler_post_to_channel = ConversationHandler(
-        entry_points=[CallbackQueryHandler(post_to_channel, pattern="post_to_channel")],
+        entry_points=[CallbackQueryHandler(post_to_channel, pattern="^post_to_channel$")],
         states={
             POST_TO_CHANNEL: [CallbackQueryHandler(select_channel_for_post, pattern="^post_select_")],
             POST_TYPE: [CallbackQueryHandler(select_post_type, pattern="^type_")],
@@ -1033,13 +1010,14 @@ async def main() -> None:
             POST_BUTTON_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_button_text)],
             POST_BUTTON_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_post_to_channel)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)],
         per_message=True,
+        allow_reentry=False,
     )
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(check_subscription, pattern="check_sub"))
-    application.add_handler(CallbackQueryHandler(send_user_count, pattern="user_count"))
+    application.add_handler(CallbackQueryHandler(check_subscription, pattern="^check_sub$"))
+    application.add_handler(CallbackQueryHandler(send_user_count, pattern="^user_count$"))
     application.add_handler(MessageHandler(filters.ChatType.CHANNEL, get_channel_id))
     application.add_handler(conv_handler_parts)
     application.add_handler(conv_handler_simple)
@@ -1052,11 +1030,17 @@ async def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_part_selection, pattern="^part_"))
     application.add_handler(CallbackQueryHandler(handle_navigation, pattern="^nav_"))
     application.add_handler(CallbackQueryHandler(admin_panel))
-    application.add_handler(CallbackQueryHandler(restart_bot, pattern="restart_bot"))
+    application.add_handler(CallbackQueryHandler(restart_bot, pattern="^restart_bot$"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d+$"), handle_number))
 
     # Webhookni sozlash
-    await application.bot.set_webhook(url=WEBHOOK_URL)
+    try:
+        await application.bot.set_webhook(url=WEBHOOK_URL)
+        logging.info(f"Webhook muvaffaqiyatli o'rnatildi: {WEBHOOK_URL}")
+    except Exception as e:
+        logging.error(f"Webhook o'rnatishda xatolik: {e}")
+        raise
+
     app = web.Application()
     app.router.add_post('/', webhook_handler)
     runner = web.AppRunner(app)
@@ -1064,16 +1048,13 @@ async def main() -> None:
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
 
-    # Botni ishga tushirish
     await application.initialize()
     await application.start()
     logging.info(f"Bot webhook rejimida ishga tushdi: {WEBHOOK_URL}")
 
-    # Serverni doimiy ishlashini ta'minlash
     while True:
         await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    # Vaqt mintaqasini aniq belgilash
     os.environ['TZ'] = 'UTC'
     asyncio.run(main())
