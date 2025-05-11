@@ -39,7 +39,7 @@ logging.basicConfig(
 # JSON fayllarni o'qish
 def load_json(filename):
     try:
-        file_path = os.path.join("/opt/render/project/src", filename)
+        file_path = os.path.join("/opt/render/project", filename)
         logging.info(f"{filename} faylini {file_path} dan o'qishga harakat qilmoqda...")
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as file:
@@ -55,7 +55,7 @@ def load_json(filename):
 # JSON fayllarni saqlash
 def save_json(filename, data):
     try:
-        file_path = os.path.join("/opt/render/project/src", filename)
+        file_path = os.path.join("/opt/render/project", filename)
         logging.info(f"{filename} faylini {file_path} ga saqlashga harakat qilmoqda...")
         with open(file_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
