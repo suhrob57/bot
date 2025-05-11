@@ -43,7 +43,7 @@ def load_json(filename):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         possible_paths = [
             os.path.join(current_dir, filename),                    # Joriy papka
-            os.path.join("/opt/render/project/src", filename),      # Render uchun standart yo'l
+            os.path.join("/opt/render/project", filename),      # Render uchun standart yo'l
             os.path.join("/opt/render/project", filename),          # Yana bir alternativa
             filename                                                # Nisbiy yo'l
         ]
@@ -70,7 +70,7 @@ def save_json(filename, data):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         possible_paths = [
             os.path.join(current_dir, filename),
-            os.path.join("/opt/render/project/src", filename),
+            os.path.join("/opt/render/project", filename),
             os.path.join("/opt/render/project", filename),
         ]
         # Birinchi topilgan yo'lga saqlash
