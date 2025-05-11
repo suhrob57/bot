@@ -2,6 +2,8 @@ import logging
 import json
 import asyncio
 import nest_asyncio
+import os
+import sys
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -14,39 +16,38 @@ from telegram.ext import (
 )
 from telegram.constants import ChatMemberStatus
 from dotenv import load_dotenv
-import os
-import pytz
-from flask import Flask, request
-
-# Flask ilovasini yaratish
-app = Flask(__name__)
+from aiohttp import web
 
 # .env faylidan ma'lumotlarni yuklash
 load_dotenv()
 
-# nest_asyncio ni faollashtirish (Replit, Koyeb kabi platformalar uchun)
+# nest_asyncio ni faollashtirish (Render platformasi uchun)
 nest_asyncio.apply()
 
 # Bot tokeni, admin ID lar va bildirishnoma kanali ID si
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS").split(",")))
 NOTIFICATION_CHANNEL_ID = os.getenv("NOTIFICATION_CHANNEL_ID")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Renderda webhook URL, masalan: https://your-app.onrender.com
+PORT = int(os.getenv("PORT", 10000))  # Renderda PORT muhit o'zgaruvchisi
 
 # Logger sozlamalari
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-# JSON fayllarni o'qish
+# JSON fayllarni o'qish (Render uchun disk yo'li)
 def load_json(filename):
     try:
-        with open(filename, "r", encoding="utf-8") as file:
+        filepath = os.path.join("/opt/render/project", filename)
+        with open(filepath, "r", encoding="utf-8") as file:
             return json.load(file)
     except (FileNotFoundError, json.JSONDecodeError):
         return {} if filename in ["movies.json", "users.json"] else []
 
 def save_json(filename, data):
-    with open(filename, "w", encoding="utf-8") as file:
+    filepath = os.path.join("/opt/render/project", filename)
+    with open(filepath, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 # Fayllarni yuklash
@@ -59,14 +60,14 @@ def save_users(users):
     save_json("users.json", users)
 
 # ConversationHandler uchun holatlar
-MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_URL, MOVIE_NUMBER = range(4)
+MOVIE_TITLE, MOVIE_PARTS, MOVIE_PART_URL, MOVIE_NUMBER = range(4)  # MOVIE_PART_NAME olib tashlandi
 SIMPLE_MOVIE_TITLE, SIMPLE_MOVIE_URL, SIMPLE_MOVIE_NUMBER = range(4, 7)
 DELETE_MOVIE = 7
 REMOVE_CHANNEL = 8
 BROADCAST_MESSAGE = 9
 ADD_CHANNEL_TYPE, ADD_CHANNEL_ID = range(10, 12)
-ADD_NEW_PART_SELECT, ADD_NEW_PART_NAME, ADD_NEW_PART_URL = range(15, 18)
-POST_TO_CHANNEL, POST_TYPE, POST_TEXT, POST_MEDIA, POST_BUTTON_TEXT, POST_BUTTON_URL = range(18, 24)
+ADD_NEW_PART_SELECT, ADD_NEW_PART_NAME, ADD_NEW_PART_URL = range(17, 20)
+POST_TO_CHANNEL, POST_TYPE, POST_TEXT, POST_MEDIA, POST_BUTTON_TEXT, POST_BUTTON_URL = range(20, 26)
 
 # Obunani tekshirish (username yoki chat_id asosida)
 async def is_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE, channel) -> bool:
@@ -127,11 +128,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             [InlineKeyboardButton("🎬 Oddiy Anime qo‘shish", callback_data="add_simple_movie")],
             [InlineKeyboardButton("📢 Kanal qo‘shish", callback_data="add_channel")],
             [InlineKeyboardButton("❌ Kanalni o'chirish", callback_data="remove_channel")],
-            [InlineKeyboardButton("🗑Animeni o'chirish", callback_data="delete_movie")],
+            [InlineKeyboardButton("🗑 Animeni o'chirish", callback_data="delete_movie")],
             [InlineKeyboardButton("➕ Yangi qism qo‘shish", callback_data="add_new_part")],
             [InlineKeyboardButton("📤 Kanalga post yuborish", callback_data="post_to_channel")],
             [InlineKeyboardButton("👥 Foydalanuvchilar soni", callback_data="user_count")],
             [InlineKeyboardButton("📩 Foydalanuvchilarga xabar yuborish", callback_data="broadcast")],
+            [InlineKeyboardButton("🔄 Botni qayta ishga tushirish", callback_data="restart_bot")],  # Yangi tugma
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Admin paneliga xush kelibsiz!", reply_markup=reply_markup)
@@ -158,7 +160,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = query.from_user.id
     is_all_subscribed = all([await is_subscribed(user_id, context, channel) for channel in CHANNELS])
     if is_all_subscribed:
-        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanish mumkin.")
+        await query.edit_message_text("✅ Siz barcha kanallarga obuna bo‘lgansiz! Botdan foydalanishingiz mumkin.")
     else:
         await query.edit_message_text("❌ Siz hali barcha kanallarga obuna bo‘lmagansiz. Iltimos, obuna bo‘ling.")
 
@@ -244,7 +246,22 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return await broadcast(update, context)
     elif query.data == "post_to_channel":
         return await post_to_channel(update, context)
+    elif query.data == "restart_bot":
+        return await restart_bot(update, context)
     return ConversationHandler.END
+
+# Botni qayta ishga tushirish
+async def restart_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    if user_id not in ADMIN_IDS:
+        await query.edit_message_text("Siz admin emassiz!")
+        return
+
+    await query.edit_message_text("Bot qayta ishga tushirilmoqda...")
+    # Renderda jarayonni qayta boshlash uchun
+    os._exit(0)
 
 # Kino qo‘shish: Kino nomini so'rash
 async def movie_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -261,6 +278,12 @@ async def movie_parts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data["movie_parts"] = parts
         context.user_data["current_part"] = 1
         context.user_data["movie_part_data"] = []
+        # Qism nomlarini avtomatik yaratish
+        for i in range(1, parts + 1):
+            context.user_data["movie_part_data"].append({
+                "part_name": f"{i}-qism",
+                "part_url": None
+            })
         await update.message.reply_text("1-qism URL manzilini kiriting:")
         return MOVIE_PART_URL
     except ValueError:
@@ -270,14 +293,10 @@ async def movie_parts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 # Kino qo‘shish: Har bir qismning URL manzilini so'rash
 async def movie_part_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     part_url = update.message.text
-    current_part = context.user_data["current_part"]
-    part_data = {
-        "part_name": f"{current_part}-qism",
-        "part_url": part_url,
-    }
-    context.user_data["movie_part_data"].append(part_data)
+    current_part = context.user_data["current_part"] - 1  # Indeks 0 dan boshlanadi
+    context.user_data["movie_part_data"][current_part]["part_url"] = part_url
 
-    if current_part < context.user_data["movie_parts"]:
+    if context.user_data["current_part"] < context.user_data["movie_parts"]:
         context.user_data["current_part"] += 1
         await update.message.reply_text(f"{context.user_data['current_part']}-qism URL manzilini kiriting:")
         return MOVIE_PART_URL
@@ -668,23 +687,56 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     video_info = movies_data.get(number)
     if video_info:
         if "part_data" in video_info and video_info["part_data"]:
-            # Faqat birinchi qismni yuborish
+            # Birinchi qismni yuborish
             first_part = video_info["part_data"][0]
-            await update.message.reply_video(
+            # Sahifalash uchun ma'lumotlarni saqlash
+            context.user_data["current_page"] = 0  # Birinchi sahifa
+            context.user_data["movie_number"] = number
+            context.user_data["selected_part_index"] = 0  # Birinchi qism tanlangan
+
+            # Tugmalarni sahifalash bilan yaratish
+            parts = video_info["part_data"]
+            parts_per_page = 5  # Har bir sahifada 5 ta qism
+            start_idx = context.user_data["current_page"] * parts_per_page
+            end_idx = start_idx + parts_per_page
+            visible_parts = parts[start_idx:end_idx]
+
+            # Tugmalar ro'yxatini tayyorlash (tanlangan qismdan tashqari)
+            keyboard = []
+            current_row = []
+            for i, part in enumerate(parts):
+                if i != 0:  # Birinchi qismni o'tkazib yuboramiz (hozir ko'rsatilmoqda)
+                    if start_idx <= i < end_idx:
+                        current_row.append(InlineKeyboardButton(
+                            f"{part['part_name']}", callback_data=f"part_{number}_{i}"
+                        ))
+                        if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+                            keyboard.append(current_row)
+                            current_row = []
+            if current_row:  # Qolgan tugmalarni qatorga qo'shish
+                keyboard.append(current_row)
+
+            # Navigatsiya tugmalari
+            nav_row = []
+            total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page  # Sahifalar soni
+            if context.user_data["current_page"] > 0:
+                nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{number}_prev"))
+            if context.user_data["current_page"] < total_pages - 1:
+                nav_row.append(InlineKeyboardButton("➡️", callback_data=f"nav_{number}_next"))
+            if nav_row:
+                keyboard.append(nav_row)
+
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            # Video xabarini yuborish
+            message = await update.message.reply_video(
                 video=first_part["part_url"],
                 caption=f"📄 Anime nomi: {video_info['title']}\n🔗 Qism: {first_part['part_name']}\n👁 Ko‘rilganlar: {video_info['views']}",
+                reply_markup=reply_markup
             )
-
-            # 2-qismdan boshlab tugmalar yaratish
-            if len(video_info["part_data"]) > 1:
-                keyboard = [
-                    [InlineKeyboardButton(f"{part['part_name']}", callback_data=f"part_{number}_{i}")]
-                    for i, part in enumerate(video_info["part_data"][1:], start=1)
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(
-                    "Qolgan qismlarni tanlang:", reply_markup=reply_markup
-                )
+            # Xabar ID sini saqlash
+            context.user_data["last_message_id"] = message.message_id
+            context.user_data["last_chat_id"] = message.chat_id
+            context.user_data["last_movie_number"] = number
 
         elif "video_url" in video_info:
             await update.message.reply_video(
@@ -716,22 +768,145 @@ async def handle_part_selection(update: Update, context: ContextTypes.DEFAULT_TY
 
     video_info = movies_data.get(movie_number)
     if video_info and "part_data" in video_info and part_index < len(video_info["part_data"]):
+        # Avvalgi xabarni tahrirlash (tugmalarni olib tashlash)
+        last_message_id = context.user_data.get("last_message_id")
+        last_chat_id = context.user_data.get("last_chat_id")
+        if last_message_id and last_chat_id:
+            try:
+                await context.bot.edit_message_reply_markup(
+                    chat_id=last_chat_id,
+                    message_id=last_message_id,
+                    reply_markup=None
+                )
+            except Exception as e:
+                logging.error(f"Avvalgi xabarni tahrirlashda xatolik: {e}")
+
+        # Tanlangan qismni yuborish
         part = video_info["part_data"][part_index]
-        await query.message.reply_video(
+        context.user_data["selected_part_index"] = part_index  # Tanlangan qism indeksini saqlash
+
+        # Tugmalarni sahifalash bilan yaratish
+        parts = video_info["part_data"]
+        parts_per_page = 5  # Har bir sahifada 5 ta qism
+        current_page = context.user_data.get("current_page", 0)
+        start_idx = current_page * parts_per_page
+        end_idx = start_idx + parts_per_page
+        visible_parts = parts[start_idx:end_idx]
+
+        # Tugmalar ro'yxatini tayyorlash (tanlangan qismdan tashqari)
+        keyboard = []
+        current_row = []
+        for i, part in enumerate(parts):
+            if i != part_index:  # Tanlangan qismni o'tkazib yuboramiz
+                if start_idx <= i < end_idx:
+                    current_row.append(InlineKeyboardButton(
+                        f"{part['part_name']}", callback_data=f"part_{movie_number}_{i}"
+                    ))
+                    if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+                        keyboard.append(current_row)
+                        current_row = []
+        if current_row:  # Qolgan tugmalarni qatorga qo'shish
+            keyboard.append(current_row)
+
+        # Navigatsiya tugmalari
+        nav_row = []
+        total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page  # Sahifalar soni
+        if current_page > 0:
+            nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{movie_number}_prev"))
+        if current_page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton("➡️", callback_data=f"nav_{movie_number}_next"))
+        if nav_row:
+            keyboard.append(nav_row)
+
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+        # Yangi video xabarini yuborish
+        message = await query.message.reply_video(
             video=part["part_url"],
             caption=f"📄 Anime nomi: {video_info['title']}\n🔗 Qism: {part['part_name']}\n👁 Ko‘rilganlar: {video_info['views']}",
+            reply_markup=reply_markup
         )
+        # Yangi xabar ID sini saqlash
+        context.user_data["last_message_id"] = message.message_id
+        context.user_data["last_chat_id"] = message.chat_id
+        context.user_data["last_movie_number"] = movie_number
+
         video_info["views"] += 1
         save_json("movies.json", movies_data)
     else:
-        await query.edit_message_text("Qism topilmadi!")
+        await query.message.reply_text("❌ Boshqa qism topilmadi!")
 
-# Webhook so'rovlarini qabul qilish uchun endpoint
-@app.route('/webhook', methods=['POST'])
-async def webhook():
-    update = Update.de_json(request.get_json(), application.bot)
+# Navigatsiya tugmalarini boshqarish
+async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data.split("_")
+    movie_number = data[1]
+    action = data[2]  # "prev" yoki "next"
+
+    video_info = movies_data.get(movie_number)
+    if not video_info or "part_data" not in video_info:
+        await query.message.reply_text("❌ Boshqa qism topilmadi!")
+        return
+
+    # Sahifani yangilash
+    current_page = context.user_data.get("current_page", 0)
+    parts = video_info["part_data"]
+    parts_per_page = 5
+    total_pages = (len(parts) - 1 + parts_per_page - 1) // parts_per_page
+
+    if action == "prev" and current_page > 0:
+        context.user_data["current_page"] -= 1
+    elif action == "next" and current_page < total_pages - 1:
+        context.user_data["current_page"] += 1
+
+    # Yangi tugmalar ro'yxatini yaratish
+    current_page = context.user_data["current_page"]
+    start_idx = current_page * parts_per_page
+    end_idx = start_idx + parts_per_page
+    visible_parts = parts[start_idx:end_idx]
+
+    selected_part_index = context.user_data.get("selected_part_index", 0)
+    keyboard = []
+    current_row = []
+    for i, part in enumerate(parts):
+        if i != selected_part_index:  # Tanlangan qismni o'tkazib yuboramiz
+            if start_idx <= i < end_idx:
+                current_row.append(InlineKeyboardButton(
+                    f"{part['part_name']}", callback_data=f"part_{movie_number}_{i}"
+                ))
+                if len(current_row) == 5:
+                    keyboard.append(current_row)
+                    current_row = []
+    if current_row:
+        keyboard.append(current_row)
+
+    # Navigatsiya tugmalari
+    nav_row = []
+    if current_page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️", callback_data=f"nav_{movie_number}_prev"))
+    if current_page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("➡️", callback_data=f"nav_{movie_number}_next"))
+    if nav_row:
+        keyboard.append(nav_row)
+
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    # Avvalgi xabarni tahrirlash
+    try:
+        await context.bot.edit_message_reply_markup(
+            chat_id=context.user_data["last_chat_id"],
+            message_id=context.user_data["last_message_id"],
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logging.error(f"Xabarni tahrirlashda xatolik: {e}")
+
+# Webhook so'rovlarini qabul qilish
+async def webhook_handler(request):
+    update = await request.json()
+    update = Update.de_json(update, application.bot)
     await application.process_update(update)
-    return 'OK'
+    return web.Response(text="OK")
 
 # Botni ishga tushirish
 async def main() -> None:
@@ -747,6 +922,7 @@ async def main() -> None:
             MOVIE_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, movie_number)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_simple = ConversationHandler(
@@ -757,6 +933,7 @@ async def main() -> None:
             SIMPLE_MOVIE_NUMBER: [MessageHandler(filters.TEXT & ~filters.COMMAND, simple_movie_number)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_delete = ConversationHandler(
@@ -765,6 +942,7 @@ async def main() -> None:
             DELETE_MOVIE: [CallbackQueryHandler(confirm_delete_movie, pattern="^delete_")],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_remove_channel = ConversationHandler(
@@ -777,6 +955,7 @@ async def main() -> None:
             ],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_broadcast = ConversationHandler(
@@ -785,6 +964,7 @@ async def main() -> None:
             BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_broadcast_message)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_add_channel = ConversationHandler(
@@ -794,6 +974,7 @@ async def main() -> None:
             ADD_CHANNEL_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_channel_id)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_add_new_part = ConversationHandler(
@@ -804,6 +985,7 @@ async def main() -> None:
             ADD_NEW_PART_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_new_part_url)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     conv_handler_post_to_channel = ConversationHandler(
@@ -817,6 +999,7 @@ async def main() -> None:
             POST_BUTTON_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_post_to_channel)],
         },
         fallbacks=[],
+        per_message=True,
     )
 
     application.add_handler(CommandHandler("start", start))
@@ -832,8 +1015,28 @@ async def main() -> None:
     application.add_handler(conv_handler_add_new_part)
     application.add_handler(conv_handler_post_to_channel)
     application.add_handler(CallbackQueryHandler(handle_part_selection, pattern="^part_"))
+    application.add_handler(CallbackQueryHandler(handle_navigation, pattern="^nav_"))
     application.add_handler(CallbackQueryHandler(admin_panel))
+    application.add_handler(CallbackQueryHandler(restart_bot, pattern="restart_bot"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d+$"), handle_number))
+
+    # Webhookni sozlash
+    await application.bot.set_webhook(url=WEBHOOK_URL)
+    app = web.Application()
+    app.router.add_post('/', webhook_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
+    await site.start()
+
+    # Botni ishga tushirish
+    await application.initialize()
+    await application.start()
+    logging.info(f"Bot webhook rejimida ishga tushdi: {WEBHOOK_URL}")
+
+    # Serverni doimiy ishlashini ta'minlash
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     # Vaqt mintaqasini aniq belgilash
