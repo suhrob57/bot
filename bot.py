@@ -36,26 +36,41 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-# JSON fayllarni o'qish
+# JSON fayllarni o'qish va avtomatik yaratish
 def load_json(filename):
     try:
-        file_path = os.path.join("/opt/render/project", filename)
+        # Renderda fayllar joriy direktoriyada saqlanishi mumkin
+        file_path = os.path.join(os.getcwd(), filename)
         logging.info(f"{filename} faylini {file_path} dan o'qishga harakat qilmoqda...")
-        if os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as file:
-                return json.load(file)
-        raise FileNotFoundError(f"{filename} fayli {file_path} da topilmadi.")
+
+        # Fayl mavjudligini tekshirish
+        if not os.path.exists(file_path):
+            logging.info(f"{filename} fayli topilmadi, yangi fayl yaratilmoqda...")
+            # Fayl uchun default qiymat
+            default_data = {} if filename in ["movies.json", "users.json"] else []
+            with open(file_path, "w", encoding="utf-8") as file:
+                json.dump(default_data, file, ensure_ascii=False, indent=4)
+            logging.info(f"{filename} fayli muvaffaqiyatli yaratildi: {file_path}")
+            return default_data
+
+        # Faylni o'qish
+        with open(file_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
     except FileNotFoundError as e:
         logging.error(f"{filename} fayli topilmadi: {e}")
         return {} if filename in ["movies.json", "users.json"] else []
     except json.JSONDecodeError as e:
         logging.error(f"{filename} faylida JSON formati xato: {e}")
         return {} if filename in ["movies.json", "users.json"] else []
+    except Exception as e:
+        logging.error(f"{filename} faylini o'qishda xatolik: {e}")
+        return {} if filename in ["movies.json", "users.json"] else []
 
 # JSON fayllarni saqlash
 def save_json(filename, data):
     try:
-        file_path = os.path.join("/opt/render/project", filename)
+        file_path = os.path.join(os.getcwd(), filename)
         logging.info(f"{filename} faylini {file_path} ga saqlashga harakat qilmoqda...")
         with open(file_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
@@ -966,7 +981,7 @@ async def main() -> None:
     )
 
     conv_handler_broadcast = ConversationHandler(
-        entry_points=[CallbackQueryHandler(broadcast, pattern="^broadcast$")],
+        entry_points=[CallbackQueryHandler(broadcast, pattern="^ трудом$")],
         states={
             BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_broadcast_message)],
         },
