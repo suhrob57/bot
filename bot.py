@@ -16,6 +16,7 @@ from telegram.ext import (
 from telegram.constants import ChatMemberStatus
 from dotenv import load_dotenv
 from aiohttp import web
+import uuid
 
 # .env faylidan ma'lumotlarni yuklash
 load_dotenv()
@@ -25,7 +26,7 @@ nest_asyncio.apply()
 
 # Bot sozlamalari
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(",") if os.getenv("ADMIN_IDS") else []))
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(",")) if os.getenv("ADMIN_IDS") else [])
 NOTIFICATION_CHANNEL_ID = os.getenv("NOTIFICATION_CHANNEL_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 10000))
@@ -45,6 +46,7 @@ def load_json(filename):
             default_data = {} if filename in ["movies.json", "users.json"] else []
             with open(file_path, "w", encoding="utf-8") as file:
                 json.dump(default_data, file, ensure_ascii=False, indent=4)
+            logger.info(f"{filename} fayli yaratildi: {file_path}")
             return default_data
 
         with open(file_path, "r", encoding="utf-8") as file:
